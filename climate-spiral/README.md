@@ -98,6 +98,18 @@ pas :
 Ces valeurs ont été publiées indépendamment par C3S ; elles verrouillent toute la chaîne (colonne
 source, offset, arrondi) et signalent une modification silencieuse en amont.
 
+### Actualisation automatique
+
+Le workflow [`update-era5-data.yml`](../.github/workflows/update-era5-data.yml) relance ce script
+une fois par jour (09:00 UTC) et publie le résultat s'il diffère. Comme la page charge les données
+par `fetch` à l'exécution, publier un nouveau `era5-daily-anomaly.json` sur la branche servie par
+GitHub Pages suffit — aucune reconstruction du site n'est nécessaire.
+
+Le même workflow relève l'en-tête `Last-Modified` du CSV source à chaque exécution et l'ajoute à
+`data/source-last-modified-log.csv`. La cadence de publication exacte de la source n'étant pas
+documentée, ce journal permet de la déterminer après quelques semaines de relevés, et d'ajuster
+l'horaire du cron en conséquence si besoin.
+
 Les anomalies sont stockées en **milli-degrés entiers** (`valeur / 1000 = °C`). C'est exactement la
 précision de la source ; un arrondi plus grossier reclasserait des jours situés juste au-dessus
 d'un seuil (en centi-degrés, 8 des 281 jours de 2024 passent sous la barre).

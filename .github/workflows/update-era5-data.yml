@@ -1,0 +1,57 @@
+name: Actualiser les données ERA5
+
+# Une fois par jour à 09:00 UTC. GitHub Actions n'exprime les cron qu'en UTC ;
+# c'est l'heure retenue faute d'un fuseau précisé. Le CSV source n'a été
+# observé qu'une fois à 04:55 UTC (voir source-last-modified-log.csv, alimenté
+# par ce workflow), donc 09:00 UTC laisse une marge confortable en attendant
+# d'avoir assez de relevés pour caler l'horaire avec certitude.
+on:
+  schedule:
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: era5-data-update
+  cancel-in-progress: false
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Régénérer les données
+        run: python climate-spiral/build_data.py
+
+      - name: Relever l'en-tête Last-Modified de la source
+        # Pas de cadence de publication documentée pour ce flux : ce relevé
+        # accumule des points de mesure pour la déterminer empiriquement.
+        run: |
+          SOURCE_URL="https://sites.ecmwf.int/data/climatepulse/data/series/era5_daily_series_2t_global.csv"
+          LOG_FILE="climate-spiral/data/source-last-modified-log.csv"
+          LAST_MODIFIED=$(curl -sI -A "Mozilla/5.0 (compatible; climate-spiral-build/1.0)" "$SOURCE_URL" \
+            | grep -i '^last-modified:' | cut -d' ' -f2- | tr -d '\r')
+
+          if [ ! -f "$LOG_FILE" ]; then
+            echo "checked_at_utc,last_modified" > "$LOG_FILE"
+          fi
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ),${LAST_MODIFIED}" >> "$LOG_FILE"
+
+      - name: Committer si les données ont changé
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add climate-spiral/data/era5-daily-anomaly.json climate-spiral/data/source-last-modified-log.csv
+          if git diff --cached --quiet; then
+            echo "Aucun changement, rien à committer."
+          else
+            git commit -m "Actualiser les données ERA5 ($(date -u +%Y-%m-%d))"
+            git push
+          fi
