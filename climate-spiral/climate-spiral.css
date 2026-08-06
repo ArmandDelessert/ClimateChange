@@ -1,0 +1,264 @@
+/* Climate spiral -- poster layout and controls, light and dark themes. */
+
+:root,
+[data-theme='dark'] {
+  --cs-bg: #08090c;
+  --cs-panel: rgba(255, 255, 255, 0.045);
+  --cs-border: rgba(255, 255, 255, 0.1);
+  --cs-text: #f4f1ea;
+  --cs-muted: rgba(226, 232, 240, 0.55);
+  --cs-faint: rgba(226, 232, 240, 0.34);
+  --cs-accent: #f0932b;
+  --cs-track: rgba(255, 255, 255, 0.14);
+
+  /* Read by the canvas renderer. */
+  --cs-ring: rgba(226, 232, 240, 0.16);
+  --cs-ring-accent: rgba(255, 196, 140, 0.5);
+  --cs-label: rgba(226, 232, 240, 0.45);
+}
+
+[data-theme='light'] {
+  --cs-bg: #f7f5f0;
+  --cs-panel: rgba(15, 23, 42, 0.035);
+  --cs-border: rgba(15, 23, 42, 0.12);
+  --cs-text: #16202e;
+  --cs-muted: rgba(22, 32, 46, 0.62);
+  --cs-faint: rgba(22, 32, 46, 0.42);
+  --cs-accent: #b45309;
+  --cs-track: rgba(15, 23, 42, 0.16);
+
+  --cs-ring: rgba(30, 41, 59, 0.16);
+  --cs-ring-accent: rgba(180, 83, 9, 0.6);
+  --cs-label: rgba(30, 41, 59, 0.55);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--cs-bg);
+  color: var(--cs-text);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.cs-poster {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ------------------------------------------------------------------ head */
+
+.cs-eyebrow {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: var(--cs-accent);
+  text-align: center;
+}
+
+.cs-title {
+  margin: 8px 0 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(28px, 6vw, 44px);
+  line-height: 1.1;
+  font-weight: 700;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.cs-subtitle {
+  margin: 10px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cs-muted);
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* ----------------------------------------------------------------- stage */
+
+.cs-stage {
+  position: relative;
+  aspect-ratio: 1;
+  width: 100%;
+}
+
+.cs-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Readout sits in the middle of the flat spiral; once the funnel opens it
+   slides down to the bottom-left, clear of the mouth flaring out at the top. */
+.cs-readout {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+  transition: top 0.5s ease, left 0.5s ease, transform 0.5s ease, text-align 0.5s;
+}
+
+.cs-stage.is-open .cs-readout {
+  top: 82%;
+  left: 8px;
+  transform: none;
+  text-align: left;
+}
+
+.cs-readout-year {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(34px, 8vw, 58px);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.cs-stage.is-open .cs-readout-year { font-size: clamp(24px, 5vw, 34px); }
+
+.cs-readout-detail {
+  margin-top: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: clamp(12px, 2.6vw, 16px);
+  letter-spacing: 0.1em;
+  color: var(--cs-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------- controls */
+
+.cs-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--cs-border);
+  border-radius: 12px;
+  background: var(--cs-panel);
+}
+
+.cs-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cs-row-timeline { gap: 12px; }
+
+.cs-timeline { flex: 1 1 220px; }
+
+.cs-date {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--cs-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 9ch;
+  text-align: right;
+}
+
+.cs-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--cs-muted);
+}
+
+.cs-field-openness { flex: 1 1 200px; }
+.cs-field-openness input[type='range'] { flex: 1; min-width: 90px; }
+
+.cs-spacer { flex: 1 1 auto; }
+
+button,
+select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--cs-text);
+  background: transparent;
+  border: 1px solid var(--cs-border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+button:hover,
+select:hover { background: var(--cs-panel); border-color: var(--cs-accent); }
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--cs-accent);
+  outline-offset: 2px;
+}
+
+.cs-play { min-width: 104px; font-variant-numeric: tabular-nums; }
+
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--cs-track);
+}
+
+input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--cs-track);
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: none;
+  border-radius: 50%;
+  background: var(--cs-accent);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: var(--cs-accent);
+}
+
+input[type='checkbox'] { accent-color: var(--cs-accent); }
+
+/* ---------------------------------------------------------------- footer */
+
+.cs-footnote {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  line-height: 1.7;
+  color: var(--cs-faint);
+  text-align: center;
+  text-wrap: balance;
+}
+
+.cs-footnote a { color: inherit; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-readout { transition: none; }
+}

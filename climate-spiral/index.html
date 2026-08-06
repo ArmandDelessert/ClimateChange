@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spirale du réchauffement — ERA5 quotidien depuis 1940</title>
+<meta name="description" content="Chaque jour depuis 1940 dessiné en une spirale : une boucle par année, le rayon suit l'écart de température au niveau préindustriel.">
+<link rel="stylesheet" href="climate-spiral.css">
+</head>
+<body>
+
+<main class="cs-poster">
+  <header>
+    <p class="cs-eyebrow">ERA5 QUOTIDIEN · UNE BOUCLE = UNE ANNÉE</p>
+    <h1 class="cs-title">Chaque jour depuis 1940, dessiné en une spirale</h1>
+    <p class="cs-subtitle">Température moyenne mondiale, écart au niveau préindustriel (1850-1900)</p>
+  </header>
+
+  <div class="cs-stage" id="stage">
+    <canvas class="cs-canvas" id="canvas" role="img"
+            aria-label="Spirale des températures quotidiennes mondiales depuis 1940."></canvas>
+    <div class="cs-readout" aria-hidden="true">
+      <div class="cs-readout-year" id="readout-year">1940</div>
+      <div class="cs-readout-detail" id="readout-detail">JANV · −0,76 °C</div>
+    </div>
+  </div>
+
+  <div class="cs-controls">
+    <div class="cs-row cs-row-timeline">
+      <button type="button" class="cs-play" id="play" aria-label="Lire l'animation">▶ Lire</button>
+      <input type="range" class="cs-timeline" id="timeline" min="0" max="0" value="0" step="1"
+             aria-label="Position dans la série, en jours depuis le 1er janvier 1940">
+      <span class="cs-date" id="date">1940-01-01</span>
+    </div>
+
+    <div class="cs-row">
+      <button type="button" id="prev-year" aria-label="Année précédente">‹ Année</button>
+      <button type="button" id="next-year" aria-label="Année suivante">Année ›</button>
+
+      <label class="cs-field">
+        Vitesse
+        <select id="speed" aria-label="Vitesse de lecture">
+          <option value="90">0,5×</option>
+          <option value="180" selected>1×</option>
+          <option value="365">2×</option>
+          <option value="730">4×</option>
+        </select>
+      </label>
+
+      <label class="cs-field">
+        <input type="checkbox" id="loop"> Boucle
+      </label>
+
+      <span class="cs-spacer"></span>
+      <button type="button" id="theme" aria-label="Basculer le thème clair ou sombre">☀ Clair</button>
+    </div>
+
+    <div class="cs-row">
+      <label class="cs-field cs-field-openness" for="openness">
+        À plat
+        <input type="range" id="openness" min="0" max="100" value="0" step="1"
+               aria-label="Ouverture : de la vue à plat à l'entonnoir 3D">
+        Entonnoir
+      </label>
+      <button type="button" id="toggle-openness">Ouvrir l'entonnoir</button>
+    </div>
+  </div>
+
+  <p class="cs-footnote" id="footnote"></p>
+</main>
+
+<script type="module">
+import { ClimateSpiral } from './climate-spiral.js';
+
+const MONTHS_FR = ['JANV', 'FÉVR', 'MARS', 'AVR', 'MAI', 'JUIN',
+  'JUIL', 'AOÛT', 'SEPT', 'OCT', 'NOV', 'DÉC'];
+
+const el = (id) => document.getElementById(id);
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const anomalyFormat = new Intl.NumberFormat('fr-FR', {
+  minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: 'always',
+});
+
+const data = await fetch('./data/era5-daily-anomaly.json').then((r) => {
+  if (!r.ok) throw new Error(`données indisponibles (HTTP ${r.status})`);
+  return r.json();
+});
+
+// Follow the OS preference on first load; the toggle takes over afterwards.
+const initialTheme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+document.documentElement.dataset.theme = initialTheme;
+
+const spiral = new ClimateSpiral(el('canvas'), data, {
+  theme: initialTheme,
+  monthLabels: MONTHS_FR,
+  speed: 180,
+});
+
+el('timeline').max = String(spiral.length - 1);
+el('footnote').textContent =
+  'Température quotidienne moyenne mondiale à 2 m (ERA5) via Copernicus C3S · '
+  + 'écart au préindustriel 1850-1900 (offset C3S +0,88 °C) · '
+  + `${spiral.length.toLocaleString('fr-FR')} jours, jusqu'au ${spiral.meta.lastDate}`;
+
+// ------------------------------------------------------------- rendering UI
+
+let scrubbing = false;
+
+spiral.on('change', (state) => {
+  if (!scrubbing) el('timeline').value = String(state.index);
+
+  el('readout-year').textContent = String(state.year);
+  el('readout-detail').textContent =
+    `${MONTHS_FR[state.month]} · ${anomalyFormat.format(state.anomalyC)} °C`;
+  el('date').textContent = state.date.toISOString().slice(0, 10);
+
+  el('play').textContent = state.playing ? '❚❚ Pause' : '▶ Lire';
+  el('play').setAttribute('aria-label', state.playing ? "Mettre l'animation en pause" : "Lire l'animation");
+
+  const open = state.openness > 0.5;
+  el('stage').classList.toggle('is-open', open);
+  el('toggle-openness').textContent = open ? 'Remettre à plat' : "Ouvrir l'entonnoir";
+
+  el('canvas').setAttribute('aria-label',
+    `Spirale des températures quotidiennes mondiales de 1940 à ${state.year}. `
+    + `Jour affiché : ${el('date').textContent}, `
+    + `${anomalyFormat.format(state.anomalyC)} °C au-dessus du niveau préindustriel.`);
+});
+
+// --------------------------------------------------------------- listeners
+
+el('play').addEventListener('click', () => spiral.toggle());
+el('prev-year').addEventListener('click', () => spiral.stepYear(-1));
+el('next-year').addEventListener('click', () => spiral.stepYear(+1));
+el('loop').addEventListener('change', (e) => spiral.setLoop(e.target.checked));
+el('speed').addEventListener('change', (e) => spiral.setSpeed(Number(e.target.value)));
+
+el('timeline').addEventListener('pointerdown', () => { scrubbing = true; spiral.pause(); });
+el('timeline').addEventListener('pointerup', () => { scrubbing = false; });
+el('timeline').addEventListener('input', (e) => spiral.seekToIndex(Number(e.target.value)));
+
+el('openness').addEventListener('input', (e) => {
+  // Dragging is already continuous, so skip the eased transition.
+  spiral.setOpenness(Number(e.target.value) / 100, false);
+});
+
+el('toggle-openness').addEventListener('click', () => {
+  const next = spiral.openness > 0.5 ? 0 : 1;
+  spiral.setOpenness(next, !reduceMotion);
+  el('openness').value = String(next * 100);
+});
+
+el('theme').addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  spiral.setTheme(next);
+  el('theme').textContent = next === 'dark' ? '☀ Clair' : '☾ Sombre';
+});
+el('theme').textContent = initialTheme === 'dark' ? '☀ Clair' : '☾ Sombre';
+
+document.addEventListener('keydown', (event) => {
+  const tag = event.target.tagName;
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'BUTTON') return;
+  const actions = {
+    ' ': () => spiral.toggle(),
+    ArrowLeft: () => spiral.stepYear(-1),
+    ArrowRight: () => spiral.stepYear(+1),
+    Home: () => { spiral.pause(); spiral.seekToIndex(0); },
+    End: () => { spiral.pause(); spiral.seekToIndex(spiral.length - 1); },
+  };
+  const action = actions[event.key];
+  if (!action) return;
+  event.preventDefault();
+  action();
+});
+
+if (!reduceMotion) spiral.play();
+</script>
+
+</body>
+</html>

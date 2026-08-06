@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visualisations</title>
+<meta name="description" content="Recueil de visualisations et animations de données.">
+<style>
+  :root, [data-theme='dark'] {
+    --bg: #08090c; --text: #f4f1ea; --muted: rgba(226,232,240,0.6);
+    --border: rgba(255,255,255,0.12); --hover: rgba(255,255,255,0.05);
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f7f5f0; --text: #16202e; --muted: rgba(22,32,46,0.65); --border: rgba(15,23,42,0.14); --hover: rgba(15,23,42,0.04); }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 64px 20px; }
+  h1 { font-family: Georgia, 'Times New Roman', serif; font-size: clamp(28px, 5vw, 40px); margin: 0 0 12px; }
+  p.lead { color: var(--muted); margin: 0 0 40px; }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  li a {
+    display: block; padding: 18px 20px; border: 1px solid var(--border); border-radius: 12px;
+    color: inherit; text-decoration: none; transition: background 0.15s ease;
+  }
+  li a:hover { background: var(--hover); }
+  .title { font-size: 17px; font-weight: 600; }
+  .desc { margin-top: 4px; font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Visualisations</h1>
+  <p class="lead">Animations et graphiques de données, chacun autonome dans son propre dossier.</p>
+  <ul>
+    <li>
+      <a href="climate-spiral/">
+        <div class="title">Spirale du réchauffement</div>
+        <div class="desc">Chaque jour depuis 1940, ERA5 quotidien, une boucle par année.</div>
+      </a>
+    </li>
+  </ul>
+</main>
+</body>
+</html>
