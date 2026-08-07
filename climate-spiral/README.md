@@ -185,11 +185,16 @@ depuis une autre origine.
   ou un changement de caméra le reconstruit.
 - **Survol.** `setHoverPoint` place le point sur le plan de l'année actuellement affichée et
   résout l'angle par une itération à point fixe (la perspective dépend du rayon qu'on cherche à
-  déterminer) : suffisant pour une aide au survol, sans viser une précision infra-jour.
+  déterminer) : suffisant pour une aide au survol, sans viser une précision infra-jour. Le trait va
+  du bord intérieur du dessin (rayon `A_MIN`, pas du centre) jusqu'au-delà de l'anneau extérieur, et
+  n'est affiché qu'en vue de dessus (`openness < 0,02`) : une fois l'entonnoir incliné, cette
+  hypothèse de plan unique ne tient plus et le trait couperait visiblement à travers les boucles des
+  autres années.
 - **Illumination des anneaux.** Chaque anneau de référence (0/+0,5/+1/+1,5/+2 °C) mémorise à
   l'initialisation le premier jour où il a été franchi (`#ringFirstCross`), et s'illumine puis
-  s'estompe sur 45 jours simulés à partir de ce jour précis — un événement figé dans le temps, pas
-  un état : revenir en arrière puis rejouer refranchit le même jour et rallume le même flash.
+  s'estompe sur 365 jours simulés à partir de ce jour précis (~2 s à la vitesse par défaut) — un
+  événement figé dans le temps, pas un état : revenir en arrière puis rejouer refranchit le même
+  jour et rallume le même flash.
 - **Groupement des tracés.** Les segments sont répartis par godet de couleur en une seule passe
   (et non en rebalayant l'année une fois par godet), et les segments consécutifs de même couleur
   forment un seul sous-chemin — des sous-chemins isolés feraient rasteriser deux embouts de ligne
@@ -210,3 +215,10 @@ Raccourcis clavier :
 | ← → | Année précédente / suivante |
 | Ctrl/Cmd/Maj + ← → | Jour précédent / suivant |
 | Origine / Fin | Tout début (1940-01-01) / jour le plus récent |
+
+`Origine`/`Fin` couvrent déjà les extrémités, par la convention quasi universelle des lecteurs
+média et des `<input type="range">` natifs — pas besoin d'une combinaison en plus pour ça. Pour le
+pas fin, en revanche, ce module inverse volontairement la convention courante des éditeurs de texte
+et de Figma/Photoshop (« touche seule = petit pas, modificateur = grand pas ») : ici, la touche
+seule fait un **an**, le modificateur un **jour**, parce que sur 87 ans et 31 000+ jours, parcourir
+au jour par défaut serait épuisant.

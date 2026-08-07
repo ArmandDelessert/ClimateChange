@@ -69,8 +69,10 @@ const OPENNESS_TRANSITION_MS = 900;
 
 /** How long a reference ring stays lit after being crossed for the first
  *  time, in simulated days (not wall-clock time -- it fades faster at
- *  higher playback speeds, same as everything else on the canvas). */
-const RING_GLOW_DAYS = 45;
+ *  higher playback speeds, same as everything else on the canvas). A full
+ *  year reads as "lit for about one more loop", roughly 2s at the default
+ *  1x speed (180 days/s). */
+const RING_GLOW_DAYS = 365;
 
 /**
  * Colour ramps, sampled into `BUCKETS` steps at init. Stops are
@@ -755,7 +757,10 @@ export class ClimateSpiral {
       ctx.globalAlpha = 1;
     }
 
-    if (this.#hoverX !== null) this.#drawHoverGuide(ctx, k, cam, z);
+    // Only in the top-down view: once tilted, the pointer-to-day inversion
+    // is an approximation (see #drawHoverGuide) and the line cuts visibly
+    // across other years' loops instead of following the current one.
+    if (this.#hoverX !== null && this.#openness < 0.02) this.#drawHoverGuide(ctx, k, cam, z);
 
     if (fade <= 0.05) return;
     ctx.globalAlpha = fade;
@@ -805,12 +810,16 @@ export class ClimateSpiral {
     let d = Math.round(((theta + Math.PI / 2) / (2 * Math.PI)) * daysInYear);
     d = ((d % daysInYear) + daysInYear) % daysInYear;
 
+    // Runs from the inner bound of the drawing (A_MIN, not the centre) out
+    // past the outer ring, like the reference rings' own radial extent.
+    const rInner = this.#radiusPx(A_MIN, cam);
     const rOuter = this.#radiusPx(this.#aMax, cam) * 1.06;
-    const y0 = 0; // centre of the circle, local coordinates
+    const y0 = Math.sin(theta) * rInner;
     const y1 = Math.sin(theta) * rOuter;
+    const s0 = this.#perspective(y0, z, cam);
     const s1 = this.#perspective(y1, z, cam);
-    const px0 = cam.cx;
-    const py0 = cam.cy + (y0 * cam.cosT - z * cam.sinT) * s * cam.scale + cam.yShift;
+    const px0 = cam.cx + Math.cos(theta) * rInner * s0 * cam.scale;
+    const py0 = cam.cy + (y0 * cam.cosT - z * cam.sinT) * s0 * cam.scale + cam.yShift;
     const px1 = cam.cx + Math.cos(theta) * rOuter * s1 * cam.scale;
     const py1 = cam.cy + (y1 * cam.cosT - z * cam.sinT) * s1 * cam.scale + cam.yShift;
 

@@ -38,14 +38,11 @@
       <button type="button" id="next-year" aria-label="Année suivante">Année ›</button>
       <button type="button" id="go-end" aria-label="Aller au jour le plus récent">Présent ⏭</button>
 
-      <label class="cs-field">
+      <label class="cs-field cs-field-speed" for="speed">
         Vitesse
-        <select id="speed" aria-label="Vitesse de lecture">
-          <option value="90">0,5×</option>
-          <option value="180" selected>1×</option>
-          <option value="365">2×</option>
-          <option value="730">4×</option>
-        </select>
+        <input type="range" id="speed" min="30" max="1460" step="10" value="180"
+               aria-label="Vitesse de lecture, en jours par seconde">
+        <span id="speed-label">1,0×</span>
       </label>
 
       <label class="cs-field">
@@ -137,7 +134,14 @@ el('prev-year').addEventListener('click', () => spiral.stepYear(-1));
 el('next-year').addEventListener('click', () => spiral.stepYear(+1));
 el('go-end').addEventListener('click', () => { spiral.pause(); spiral.seekToIndex(spiral.length - 1); });
 el('loop').addEventListener('change', (e) => spiral.setLoop(e.target.checked));
-el('speed').addEventListener('change', (e) => spiral.setSpeed(Number(e.target.value)));
+
+// 180 days/s is the "1x" reference (about 2s per year of drawing).
+const SPEED_1X = 180;
+el('speed').addEventListener('input', (e) => {
+  const value = Number(e.target.value);
+  spiral.setSpeed(value);
+  el('speed-label').textContent = `${(value / SPEED_1X).toFixed(1).replace('.', ',')}×`;
+});
 
 el('timeline').addEventListener('pointerdown', () => { scrubbing = true; spiral.pause(); });
 el('timeline').addEventListener('pointerup', () => { scrubbing = false; });

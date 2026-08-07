@@ -170,6 +170,9 @@ body {
 .cs-field-openness { flex: 1 1 200px; }
 .cs-field-openness input[type='range'] { flex: 1; min-width: 90px; }
 
+.cs-field-speed input[type='range'] { width: 90px; }
+.cs-field-speed span { min-width: 3.5ch; font-variant-numeric: tabular-nums; }
+
 .cs-spacer { flex: 1 1 auto; }
 
 button,
