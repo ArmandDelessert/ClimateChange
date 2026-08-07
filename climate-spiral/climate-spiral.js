@@ -38,10 +38,11 @@ const R_INNER = 0.2;
  *  Flipping the sign here keeps the depth order intact -- 1940 remains the
  *  furthest plane -- unlike flipping the sign of z, which would put the wide
  *  mouth at the back.
- *  At the full -90 deg the view is edge-on: each loop is seen from exactly
- *  its own plane, so it draws as a flat band rather than an ellipse. That is
- *  the geometrically correct "fully open" state, not a bug. */
-const TILT_MAX = (-90 * Math.PI) / 180;
+ *  Approaching -90 deg the view turns edge-on: each loop is seen from
+ *  nearly its own plane, so it draws as a flat band rather than an ellipse
+ *  -- geometrically correct, not a bug, but distant years flatten out
+ *  first (see the "Ouverture complète" note in the README). */
+const TILT_MAX = (-68 * Math.PI) / 180;
 const SPREAD_TOTAL = 2.3; // depth of the whole 1940->today stack
 const FOCAL = 4.6;
 const VIEW_SCALE_OPEN = 0.58; // shrink when open, so the funnel still fits
@@ -65,6 +66,11 @@ const DEFAULT_MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
   'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
 const OPENNESS_TRANSITION_MS = 900;
+
+/** How long a reference ring stays lit after being crossed for the first
+ *  time, in simulated days (not wall-clock time -- it fades faster at
+ *  higher playback speeds, same as everything else on the canvas). */
+const RING_GLOW_DAYS = 45;
 
 /**
  * Colour ramps, sampled into `BUCKETS` steps at init. Stops are
@@ -130,6 +136,11 @@ export class ClimateSpiral {
   // Hot end of the radius/colour scale, extended past A_MAX_FLOOR only if
   // the data demands it. See the comment on A_MAX_FLOOR.
   #aMax = A_MAX_FLOOR;
+  // First day index each reference ring's threshold was exceeded, parallel
+  // to RING_VALUES; -1 if never (possible for a ring above A_MAX).
+  #ringFirstCross;
+  // Pointer position in canvas bitmap pixels, or null when not hovering.
+  #hoverX = null; #hoverY = null;
   // Scratch space for one year's projected points (366 days + bridge).
   #sx = new Float32Array(SCRATCH); #sy = new Float32Array(SCRATCH); #sb = new Uint8Array(SCRATCH);
   // Segment slots grouped by colour bucket, filled in a single pass.
@@ -239,6 +250,14 @@ export class ClimateSpiral {
     };
     this.#farAnom = maxOf(0);
     this.#nearAnom = maxOf(this.#yearCount - 1);
+
+    this.#ringFirstCross = new Int32Array(RING_VALUES.length).fill(-1);
+    for (let r = 0; r < RING_VALUES.length; r++) {
+      const threshold = RING_VALUES[r];
+      for (let idx = 0; idx < n; idx++) {
+        if (this.#anom[idx] > threshold) { this.#ringFirstCross[r] = idx; break; }
+      }
+    }
   }
 
   #applyTheme() {
@@ -344,6 +363,25 @@ export class ClimateSpiral {
   stepDay(delta) {
     this.pause();
     this.seekToIndex(this.index + delta);
+  }
+
+  /**
+   * Show a guide line and date at this point on the canvas, replacing the
+   * fixed month ticks with a precise, cursor-following one.
+   * @param {number} x bitmap-pixel x, e.g. `(event.clientX - rect.left) * devicePixelRatio`
+   * @param {number} y bitmap-pixel y, same convention
+   */
+  setHoverPoint(x, y) {
+    this.#hoverX = x;
+    this.#hoverY = y;
+    this.requestRender();
+  }
+
+  /** Hide the hover guide (e.g. on `pointerleave`). */
+  clearHover() {
+    if (this.#hoverX === null) return;
+    this.#hoverX = this.#hoverY = null;
+    this.requestRender();
   }
 
   /**
@@ -491,10 +529,17 @@ export class ClimateSpiral {
     // shrunk, so the tilted funnel drifts off centre. Re-centre it on the
     // midpoint of its vertical extent. The far plane (1940) sits lowest, so
     // its extreme is its own bottom edge; the near plane's is its top edge.
+    //
+    // This estimate is only valid once there is real depth to distort: at
+    // o=0 there is no tilt and no separation, so every year is drawn with
+    // the identical mapping and is already centred -- yet farAnom and
+    // nearAnom generally differ (1940's peak vs. the current year's), so
+    // without the `* o` factor this would nudge the flat view off-centre
+    // for no geometric reason.
     const zEdge = ((this.#yearCount - 1) / 2) * cam.spread;
     const lowest = this.#planeY(this.#radiusPx(this.#farAnom, cam), zEdge, cam);
     const highest = this.#planeY(-this.#radiusPx(this.#nearAnom, cam), -zEdge, cam);
-    cam.yShift = -((lowest + highest) / 2) * cam.scale;
+    cam.yShift = -((lowest + highest) / 2) * cam.scale * o;
     return cam;
   }
 
@@ -656,7 +701,8 @@ export class ClimateSpiral {
     ctx.font = `${Math.round(10 * this.#dpr)}px ui-monospace, monospace`;
     ctx.textAlign = 'center';
 
-    for (const value of RING_VALUES) {
+    for (let ri = 0; ri < RING_VALUES.length; ri++) {
+      const value = RING_VALUES[ri];
       const r = this.#radiusPx(value, cam);
       ctx.beginPath();
       for (let p = 0; p <= steps; p++) {
@@ -667,7 +713,28 @@ export class ClimateSpiral {
         const py = cam.cy + (y * cam.cosT - z * cam.sinT) * s * cam.scale + cam.yShift;
         p === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
       }
+
       const accent = value === 1.5;
+
+      // Lit up the first time the data crosses this threshold, fading over
+      // the following RING_GLOW_DAYS -- a one-off event, not a state, so it
+      // never reappears once the fade completes, even scrubbing back and
+      // forth across the crossing re-triggers it (glow is purely a function
+      // of how far the cursor now sits past that fixed historical day).
+      const firstCross = this.#ringFirstCross[ri];
+      const daysSince = firstCross >= 0 ? this.index - firstCross : -1;
+      const glow = daysSince >= 0 ? clamp(1 - daysSince / RING_GLOW_DAYS, 0, 1) : 0;
+      if (glow > 0.02) {
+        ctx.save();
+        ctx.shadowColor = accent ? this.#chrome.ringAccent : '#ffffff';
+        ctx.shadowBlur = 16 * this.#dpr * glow;
+        ctx.strokeStyle = accent ? this.#chrome.ringAccent : '#ffffff';
+        ctx.lineWidth = ((accent ? 1.4 : 1) + 3 * glow) * this.#dpr;
+        ctx.globalAlpha = Math.min(1, 0.5 + glow);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       ctx.strokeStyle = accent ? this.#chrome.ringAccent : this.#chrome.ring;
       ctx.lineWidth = (accent ? 1.4 : 1) * this.#dpr;
       if (!accent) ctx.setLineDash([4 * this.#dpr, 6 * this.#dpr]);
@@ -688,36 +755,12 @@ export class ClimateSpiral {
       ctx.globalAlpha = 1;
     }
 
+    if (this.#hoverX !== null) this.#drawHoverGuide(ctx, k, cam, z);
+
     if (fade <= 0.05) return;
     ctx.globalAlpha = fade;
 
-    // Month boundary ticks: short marks between the outer ring and the
-    // labels, at each month's start rather than its middle.
-    const rTick = this.#radiusPx(this.#aMax, cam);
-    const tickLen = cam.base * 0.045;
-    ctx.strokeStyle = this.#chrome.label;
-    ctx.lineWidth = this.#dpr;
-    for (let m = 0; m < 12; m++) {
-      const theta = (2 * Math.PI * m) / 12 - Math.PI / 2;
-      const cosA = Math.cos(theta);
-      const sinA = Math.sin(theta);
-      const y0 = sinA * rTick;
-      const y1 = sinA * (rTick + tickLen);
-      const s0 = this.#perspective(y0, z, cam);
-      const s1 = this.#perspective(y1, z, cam);
-      ctx.beginPath();
-      ctx.moveTo(
-        cam.cx + cosA * rTick * s0 * cam.scale,
-        cam.cy + (y0 * cam.cosT - z * cam.sinT) * s0 * cam.scale + cam.yShift,
-      );
-      ctx.lineTo(
-        cam.cx + cosA * (rTick + tickLen) * s1 * cam.scale,
-        cam.cy + (y1 * cam.cosT - z * cam.sinT) * s1 * cam.scale + cam.yShift,
-      );
-      ctx.stroke();
-    }
-
-    // Month labels, just outside the ticks.
+    // Month labels.
     const rLabel = this.#radiusPx(this.#aMax, cam) * 1.06;
     ctx.fillStyle = this.#chrome.label;
     ctx.textBaseline = 'middle';
@@ -732,6 +775,65 @@ export class ClimateSpiral {
       );
     }
     ctx.globalAlpha = 1;
+  }
+
+  /**
+   * A single guide line + date at the pointer's angle, replacing the fixed
+   * month ticks with one that follows the cursor to day precision.
+   *
+   * The pointer is inverted assuming it sits on the current year's plane
+   * (the one `#drawRings` is already drawing into) -- reasonable since that
+   * plane is what visually reads as "the front" of the scene. Perspective
+   * depends on the very radius being solved for, so this takes one
+   * fixed-point refinement step rather than a closed-form inverse; plenty
+   * for a hover aid where sub-day angular precision isn't the point.
+   */
+  #drawHoverGuide(ctx, k, cam, z) {
+    if (Math.abs(cam.cosT) < 0.05) return; // near edge-on: inversion is unstable, skip rather than jitter
+
+    let y = 0;
+    for (let iter = 0; iter < 2; iter++) {
+      const s = this.#perspective(y, z, cam);
+      y = ((this.#hoverY - cam.cy - cam.yShift) / (s * cam.scale) + z * cam.sinT) / cam.cosT;
+    }
+    const s = this.#perspective(y, z, cam);
+    const x = (this.#hoverX - cam.cx) / (s * cam.scale);
+
+    const theta = Math.atan2(y, x);
+    const label = this.#yearLabels[k];
+    const daysInYear = isLeap(Number(label)) ? 366 : 365;
+    let d = Math.round(((theta + Math.PI / 2) / (2 * Math.PI)) * daysInYear);
+    d = ((d % daysInYear) + daysInYear) % daysInYear;
+
+    const rOuter = this.#radiusPx(this.#aMax, cam) * 1.06;
+    const y0 = 0; // centre of the circle, local coordinates
+    const y1 = Math.sin(theta) * rOuter;
+    const s1 = this.#perspective(y1, z, cam);
+    const px0 = cam.cx;
+    const py0 = cam.cy + (y0 * cam.cosT - z * cam.sinT) * s * cam.scale + cam.yShift;
+    const px1 = cam.cx + Math.cos(theta) * rOuter * s1 * cam.scale;
+    const py1 = cam.cy + (y1 * cam.cosT - z * cam.sinT) * s1 * cam.scale + cam.yShift;
+
+    ctx.beginPath();
+    ctx.moveTo(px0, py0);
+    ctx.lineTo(px1, py1);
+    ctx.strokeStyle = this.#chrome.ringAccent;
+    ctx.lineWidth = 1.2 * this.#dpr;
+    ctx.stroke();
+
+    const date = new Date(Date.UTC(Number(label), 0, 1));
+    date.setUTCDate(date.getUTCDate() + d);
+    const text = `${date.getUTCDate()} ${this.#months[date.getUTCMonth()]}`;
+
+    // Keep the label from clipping off the canvas edge: push it away from
+    // whichever pole (top or bottom of the circle) it's closest to.
+    const upperHalf = Math.sin(theta) < 0;
+    ctx.font = `${Math.round(11 * this.#dpr)}px ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = upperHalf ? 'top' : 'bottom';
+    const labelOffset = (upperHalf ? 1 : -1) * 4 * this.#dpr;
+    ctx.fillStyle = this.#chrome.ringAccent;
+    ctx.fillText(text, px1, py1 + labelOffset);
   }
 }
 

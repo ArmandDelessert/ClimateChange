@@ -11,9 +11,8 @@
 
 <main class="cs-poster">
   <header>
-    <p class="cs-eyebrow">ERA5 QUOTIDIEN · UNE BOUCLE = UNE ANNÉE</p>
-    <h1 class="cs-title">Chaque jour depuis 1940, dessiné en une spirale</h1>
-    <p class="cs-subtitle">Température moyenne mondiale, écart au niveau préindustriel (1850-1900)</p>
+    <h1 class="cs-title">Évolution de la température moyenne mondiale depuis 1940</h1>
+    <p class="cs-subtitle">Un point par jour, une boucle par année — écart au niveau préindustriel (1850-1900)</p>
   </header>
 
   <div class="cs-stage" id="stage">
@@ -162,6 +161,29 @@ el('theme').addEventListener('click', () => {
   el('theme').textContent = next === 'dark' ? '☀ Clair' : '☾ Sombre';
 });
 el('theme').textContent = initialTheme === 'dark' ? '☀ Clair' : '☾ Sombre';
+
+// ---------------------------------------------------------- hover / touch
+
+const canvas = el('canvas');
+const toCanvasPoint = (event) => {
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  return {
+    x: (event.clientX - rect.left) * dpr,
+    y: (event.clientY - rect.top) * dpr,
+  };
+};
+
+canvas.addEventListener('pointermove', (event) => {
+  const { x, y } = toCanvasPoint(event);
+  spiral.setHoverPoint(x, y);
+});
+canvas.addEventListener('pointerdown', (event) => {
+  const { x, y } = toCanvasPoint(event);
+  spiral.setHoverPoint(x, y);
+});
+canvas.addEventListener('pointerleave', () => spiral.clearHover());
+canvas.addEventListener('pointercancel', () => spiral.clearHover());
 
 document.addEventListener('keydown', (event) => {
   const tag = event.target.tagName;

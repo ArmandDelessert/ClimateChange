@@ -67,6 +67,8 @@ et suit les redimensionnements via un `ResizeObserver`.
 | `stepDay(±1)` | Avance ou recule d'un seul jour. |
 | `setOpenness(v, animate)` | `0` à plat, `1` entonnoir. Transition adoucie de 900 ms par défaut. |
 | `setSpeed(joursParSeconde)`, `setLoop(bool)`, `setTheme('dark'\|'light')` | |
+| `setHoverPoint(x, y)` | Affiche un trait radial + la date au jour le plus proche de ce point (coordonnées en pixels bitmap du canvas). |
+| `clearHover()` | Masque le trait de survol. |
 | `on('change', fn)` | Notifié à chaque changement d'état ; renvoie une fonction de désabonnement. |
 | `destroy()` | Libère la boucle d'animation et les observateurs. |
 
@@ -159,17 +161,20 @@ depuis une autre origine.
   point qui déborde du cadre, pas besoin de retoucher le code.
 - **Projection.** La spirale occupe le plan XY, les années s'empilent sur Z. L'ouverture pilote
   conjointement l'inclinaison et l'écartement, ce qui garantit une vue de dessus exactement plate
-  à `openness = 0`. La pile est recentrée verticalement à chaque image, sinon la division
-  perspective — qui grossit la face avant et rétrécit la face arrière — fait dériver l'entonnoir
-  hors du cadre.
+  à `openness = 0`. La pile est recentrée verticalement à chaque image (`cam.yShift`), sinon la
+  division perspective — qui grossit la face avant et rétrécit la face arrière — fait dériver
+  l'entonnoir hors du cadre. Ce recentrage est multiplié par `openness` : sans ce facteur, la vue à
+  plat se retrouvait décalée verticalement d'environ 15 % du rayon, l'estimation utilisée (écart
+  entre l'anomalie max de la première et de la dernière année) restant non nulle même sans la
+  moindre inclinaison à corriger.
 - **Sens d'ouverture.** L'entonnoir s'évase vers le haut : 1940 en bas, l'année courante en haut.
   C'est l'inclinaison qui est négative, et non le signe de Z : inverser Z retournerait aussi la
   profondeur et placerait la large embouchure au fond.
-- **Ouverture complète (90°).** À `openness = 1`, l'inclinaison atteint 90° : la caméra regarde
-  chaque plan-année exactement par la tranche. Combiné à la perspective de profondeur, ça aplatit
-  fortement les années lointaines (1940, très réduites par la distance) en bandes presque
-  horizontales, alors que les années proches (agrandies par la perspective) restent des ellipses
-  nettes — un effet de tube conique voulu, pas un défaut de rendu.
+- **Ouverture complète.** Plus `TILT_MAX` (l'inclinaison à `openness = 1`) approche 90°, plus la
+  caméra regarde les plans-années par la tranche : combiné à la perspective de profondeur, les
+  années lointaines (très réduites par la distance) s'aplatissent en bandes, tandis que les années
+  proches (agrandies par la perspective) restent des ellipses nettes — un effet de tube conique,
+  pas un défaut de rendu.
 - **Ordre de tracé.** 1940 est placé au fond de l'entonnoir et aujourd'hui à l'avant, si bien que
   l'ordre chronologique est aussi le bon ordre du peintre.
 - **Résultat déterministe.** Les chemins du script sont relatifs à son propre dossier
@@ -178,6 +183,13 @@ depuis une autre origine.
 - **Cache à deux couches.** Les années déjà terminées vivent dans un canvas hors écran ; seule
   l'année en cours est redessinée à chaque image. Avancer d'une année ajoute à ce cache, un recul
   ou un changement de caméra le reconstruit.
+- **Survol.** `setHoverPoint` place le point sur le plan de l'année actuellement affichée et
+  résout l'angle par une itération à point fixe (la perspective dépend du rayon qu'on cherche à
+  déterminer) : suffisant pour une aide au survol, sans viser une précision infra-jour.
+- **Illumination des anneaux.** Chaque anneau de référence (0/+0,5/+1/+1,5/+2 °C) mémorise à
+  l'initialisation le premier jour où il a été franchi (`#ringFirstCross`), et s'illumine puis
+  s'estompe sur 45 jours simulés à partir de ce jour précis — un événement figé dans le temps, pas
+  un état : revenir en arrière puis rejouer refranchit le même jour et rallume le même flash.
 - **Groupement des tracés.** Les segments sont répartis par godet de couleur en une seule passe
   (et non en rebalayant l'année une fois par godet), et les segments consécutifs de même couleur
   forment un seul sous-chemin — des sous-chemins isolés feraient rasteriser deux embouts de ligne
