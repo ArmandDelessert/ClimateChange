@@ -59,7 +59,7 @@ et suit les redimensionnements via un `ResizeObserver`.
 ### API
 
 | Méthode | Effet |
-|---|---|
+| --- | --- |
 | `play()` / `pause()` / `toggle()` | Lecture automatique. Relance depuis 1940 si le curseur est à la fin. |
 | `seekToIndex(i)` | Positionne sur le i-ème jour (0 = 1940-01-01). |
 | `seekToYear(1998)` | Positionne au 1er janvier de l'année. |
@@ -116,16 +116,14 @@ d'un seuil (en centi-degrés, 8 des 281 jours de 2024 passent sous la barre).
 
 ## Données et attribution
 
-Température quotidienne moyenne mondiale de l'air à 2 m, issue de la réanalyse **ERA5** produite
-par l'ECMWF pour le **Copernicus Climate Change Service (C3S)**, récupérée via la série publiée
-par [Climate Pulse](https://pulse.climate.copernicus.eu/) :
+Température quotidienne moyenne mondiale de l'air à 2 m, issue de la réanalyse **ERA5** produite par le [**Centre européen pour les prévisions météorologiques à moyen terme**](https://www.ecmwf.int/) (**CEPMMT** ; en anglais European Centre for Medium-Range Weather Forecasts, **ECMWF**) pour le [**Copernicus Climate Change Service**](https://climate.copernicus.eu/) (**C3S**), récupérée via la série publiée par [**Climate Pulse**](https://pulse.climate.copernicus.eu/) :
 
 <https://sites.ecmwf.int/data/climatepulse/data/series/era5_daily_series_2t_global.csv>
 
 Ce CSV source contient quatre colonnes :
 
 | Colonne | Signification |
-|---|---|
+| --- | --- |
 | `2t` | Température moyenne journalière absolue, moyenne des 24 valeurs horaires de 00h à 23h UTC. |
 | `clim_91-20` | Climatologie du jour : la moyenne de `2t` pour cette date calendaire (ex. tous les 15 mars), calculée sur la période de référence 1991-2020. C'est la « normale » à laquelle le jour est comparé. |
 | `ano_91-20` | Anomalie du jour par rapport à sa climatologie 1991-2020, c'est-à-dire `2t − clim_91-20`. |
