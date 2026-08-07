@@ -34,8 +34,10 @@
     </div>
 
     <div class="cs-row">
+      <button type="button" id="go-start" aria-label="Aller au tout début, 1er janvier 1940">⏮ Début</button>
       <button type="button" id="prev-year" aria-label="Année précédente">‹ Année</button>
       <button type="button" id="next-year" aria-label="Année suivante">Année ›</button>
+      <button type="button" id="go-end" aria-label="Aller au jour le plus récent">Présent ⏭</button>
 
       <label class="cs-field">
         Vitesse
@@ -131,8 +133,10 @@ spiral.on('change', (state) => {
 // --------------------------------------------------------------- listeners
 
 el('play').addEventListener('click', () => spiral.toggle());
+el('go-start').addEventListener('click', () => { spiral.pause(); spiral.seekToIndex(0); });
 el('prev-year').addEventListener('click', () => spiral.stepYear(-1));
 el('next-year').addEventListener('click', () => spiral.stepYear(+1));
+el('go-end').addEventListener('click', () => { spiral.pause(); spiral.seekToIndex(spiral.length - 1); });
 el('loop').addEventListener('change', (e) => spiral.setLoop(e.target.checked));
 el('speed').addEventListener('change', (e) => spiral.setSpeed(Number(e.target.value)));
 
@@ -162,10 +166,19 @@ el('theme').textContent = initialTheme === 'dark' ? '☀ Clair' : '☾ Sombre';
 document.addEventListener('keydown', (event) => {
   const tag = event.target.tagName;
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'BUTTON') return;
+
+  // Plain arrows step by year; Ctrl/Cmd or Shift + arrow steps by day, for
+  // fine-grained scrubbing without leaving the keyboard.
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    event.preventDefault();
+    const dir = event.key === 'ArrowLeft' ? -1 : 1;
+    if (event.ctrlKey || event.metaKey || event.shiftKey) spiral.stepDay(dir);
+    else spiral.stepYear(dir);
+    return;
+  }
+
   const actions = {
     ' ': () => spiral.toggle(),
-    ArrowLeft: () => spiral.stepYear(-1),
-    ArrowRight: () => spiral.stepYear(+1),
     Home: () => { spiral.pause(); spiral.seekToIndex(0); },
     End: () => { spiral.pause(); spiral.seekToIndex(spiral.length - 1); },
   };

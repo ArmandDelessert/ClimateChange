@@ -64,6 +64,7 @@ et suit les redimensionnements via un `ResizeObserver`.
 | `seekToIndex(i)` | Positionne sur le i-ème jour (0 = 1940-01-01). |
 | `seekToYear(1998)` | Positionne au 1er janvier de l'année. |
 | `stepYear(±1)` | Avance ou recule d'une année pleine. |
+| `stepDay(±1)` | Avance ou recule d'un seul jour. |
 | `setOpenness(v, animate)` | `0` à plat, `1` entonnoir. Transition adoucie de 900 ms par défaut. |
 | `setSpeed(joursParSeconde)`, `setLoop(bool)`, `setTheme('dark'\|'light')` | |
 | `on('change', fn)` | Notifié à chaque changement d'état ; renvoie une fonction de désabonnement. |
@@ -164,6 +165,11 @@ depuis une autre origine.
 - **Sens d'ouverture.** L'entonnoir s'évase vers le haut : 1940 en bas, l'année courante en haut.
   C'est l'inclinaison qui est négative, et non le signe de Z : inverser Z retournerait aussi la
   profondeur et placerait la large embouchure au fond.
+- **Ouverture complète (90°).** À `openness = 1`, l'inclinaison atteint 90° : la caméra regarde
+  chaque plan-année exactement par la tranche. Combiné à la perspective de profondeur, ça aplatit
+  fortement les années lointaines (1940, très réduites par la distance) en bandes presque
+  horizontales, alors que les années proches (agrandies par la perspective) restent des ellipses
+  nettes — un effet de tube conique voulu, pas un défaut de rendu.
 - **Ordre de tracé.** 1940 est placé au fond de l'entonnoir et aujourd'hui à l'avant, si bien que
   l'ordre chronologique est aussi le bon ordre du peintre.
 - **Résultat déterministe.** Les chemins du script sont relatifs à son propre dossier
@@ -181,6 +187,14 @@ depuis une autre origine.
 
 ## Accessibilité
 
-Contrôles étiquetés, raccourcis clavier (espace pour lire/pause, ← → pour changer d'année,
-Origine/Fin pour les extrémités), description vivante du canvas via `aria-label`, et lecture
-automatique désactivée si `prefers-reduced-motion` est actif.
+Contrôles étiquetés, description vivante du canvas via `aria-label`, et lecture automatique
+désactivée si `prefers-reduced-motion` est actif.
+
+Raccourcis clavier :
+
+| Touche | Effet |
+| --- | --- |
+| Espace | Lecture / pause |
+| ← → | Année précédente / suivante |
+| Ctrl/Cmd/Maj + ← → | Jour précédent / suivant |
+| Origine / Fin | Tout début (1940-01-01) / jour le plus récent |

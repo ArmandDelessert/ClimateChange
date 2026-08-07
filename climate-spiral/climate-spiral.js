@@ -37,8 +37,11 @@ const R_INNER = 0.2;
  *  end but projects to the bottom, and the current year flares out at the top.
  *  Flipping the sign here keeps the depth order intact -- 1940 remains the
  *  furthest plane -- unlike flipping the sign of z, which would put the wide
- *  mouth at the back. */
-const TILT_MAX = (-58 * Math.PI) / 180;
+ *  mouth at the back.
+ *  At the full -90 deg the view is edge-on: each loop is seen from exactly
+ *  its own plane, so it draws as a flat band rather than an ellipse. That is
+ *  the geometrically correct "fully open" state, not a bug. */
+const TILT_MAX = (-90 * Math.PI) / 180;
 const SPREAD_TOTAL = 2.3; // depth of the whole 1940->today stack
 const FOCAL = 4.6;
 const VIEW_SCALE_OPEN = 0.58; // shrink when open, so the funnel still fits
@@ -57,7 +60,7 @@ const ALPHA = {
   light: { old: 0.5, new: 1.0 },
 };
 
-const RING_VALUES = [0, 1.5, 2];
+const RING_VALUES = [0, 0.5, 1, 1.5, 2];
 const DEFAULT_MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
   'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
@@ -332,6 +335,15 @@ export class ClimateSpiral {
       return;
     }
     this.seekToIndex(this.#yearStart[k]);
+  }
+
+  /**
+   * Move by single days, clamped to the series' bounds.
+   * @param {number} delta
+   */
+  stepDay(delta) {
+    this.pause();
+    this.seekToIndex(this.index + delta);
   }
 
   /**
@@ -677,10 +689,36 @@ export class ClimateSpiral {
     }
 
     if (fade <= 0.05) return;
-
-    // Month labels, just outside the widest ring.
-    const rLabel = this.#radiusPx(this.#aMax, cam) * 1.06;
     ctx.globalAlpha = fade;
+
+    // Month boundary ticks: short marks between the outer ring and the
+    // labels, at each month's start rather than its middle.
+    const rTick = this.#radiusPx(this.#aMax, cam);
+    const tickLen = cam.base * 0.045;
+    ctx.strokeStyle = this.#chrome.label;
+    ctx.lineWidth = this.#dpr;
+    for (let m = 0; m < 12; m++) {
+      const theta = (2 * Math.PI * m) / 12 - Math.PI / 2;
+      const cosA = Math.cos(theta);
+      const sinA = Math.sin(theta);
+      const y0 = sinA * rTick;
+      const y1 = sinA * (rTick + tickLen);
+      const s0 = this.#perspective(y0, z, cam);
+      const s1 = this.#perspective(y1, z, cam);
+      ctx.beginPath();
+      ctx.moveTo(
+        cam.cx + cosA * rTick * s0 * cam.scale,
+        cam.cy + (y0 * cam.cosT - z * cam.sinT) * s0 * cam.scale + cam.yShift,
+      );
+      ctx.lineTo(
+        cam.cx + cosA * (rTick + tickLen) * s1 * cam.scale,
+        cam.cy + (y1 * cam.cosT - z * cam.sinT) * s1 * cam.scale + cam.yShift,
+      );
+      ctx.stroke();
+    }
+
+    // Month labels, just outside the ticks.
+    const rLabel = this.#radiusPx(this.#aMax, cam) * 1.06;
     ctx.fillStyle = this.#chrome.label;
     ctx.textBaseline = 'middle';
     for (let m = 0; m < 12; m++) {
