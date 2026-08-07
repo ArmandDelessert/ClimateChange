@@ -12,9 +12,21 @@
  * @module climate-spiral
  */
 
-/** Anomaly range mapped to the radius, in degC. Data spans -0.40 to +2.04. */
+/** Anomaly range mapped to the radius, in degC.
+ *
+ *  The cold end barely moves release over release -- the coldest day on
+ *  record sits at -0.40 -- so A_MIN stays a fixed constant.
+ *
+ *  The hot end does not: it is the one still climbing as data is appended
+ *  year over year. A_MAX is therefore computed per instance in #precompute(),
+ *  as the largest of this floor and (actual data max + headroom). It only
+ *  ever grows, and only when the data genuinely exceeds today's range, so
+ *  the current look (max +2.04) is reproduced exactly -- extending it is a
+ *  fallback for future data, not the normal case.
+ */
 const A_MIN = -0.6;
-const A_MAX = 2.2;
+const A_MAX_FLOOR = 2.2;
+const A_MAX_HEADROOM = 0.15;
 
 /** Radius of the inner hole, as a fraction of the outer radius. Keeps the
  *  coldest days from collapsing onto a single point. */
@@ -112,6 +124,9 @@ export class ClimateSpiral {
   #yearAlpha; #yearZ;
   // Widest anomaly of the first and last year, used to frame the open funnel.
   #farAnom = 0; #nearAnom = 0;
+  // Hot end of the radius/colour scale, extended past A_MAX_FLOOR only if
+  // the data demands it. See the comment on A_MAX_FLOOR.
+  #aMax = A_MAX_FLOOR;
   // Scratch space for one year's projected points (366 days + bridge).
   #sx = new Float32Array(SCRATCH); #sy = new Float32Array(SCRATCH); #sb = new Uint8Array(SCRATCH);
   // Segment slots grouped by colour bucket, filled in a single pass.
@@ -174,8 +189,11 @@ export class ClimateSpiral {
     this.#yearAlpha = new Float32Array(this.#yearCount);
     this.#yearZ = new Float32Array(this.#yearCount);
 
-    const span = A_MAX - A_MIN;
+    // The colour bucket needs the final A_MAX, which in turn needs the
+    // data's actual peak -- so anomalies are collected in this pass, and
+    // buckets are assigned in a second one below, once that peak is known.
     let i = 0;
+    let dataMax = -Infinity;
 
     for (let k = 0; k < this.#yearCount; k++) {
       const label = this.#yearLabels[k];
@@ -194,7 +212,7 @@ export class ClimateSpiral {
         const a = values[d] / 1000;
         this.#anom[i] = a;
         this.#yearIdx[i] = k;
-        this.#bucket[i] = clamp(Math.floor(((a - A_MIN) / span) * BUCKETS), 0, BUCKETS - 1);
+        if (a > dataMax) dataMax = a;
       }
 
       // 1940 sits at the far end of the funnel, today at the near end, so
@@ -202,6 +220,12 @@ export class ClimateSpiral {
       this.#yearZ[k] = (this.#yearCount - 1) / 2 - k;
     }
     this.#yearStart[this.#yearCount] = i;
+
+    this.#aMax = Math.max(A_MAX_FLOOR, dataMax + A_MAX_HEADROOM);
+    const span = this.#aMax - A_MIN;
+    for (let j = 0; j < n; j++) {
+      this.#bucket[j] = clamp(Math.floor(((this.#anom[j] - A_MIN) / span) * BUCKETS), 0, BUCKETS - 1);
+    }
 
     const maxOf = (k) => {
       let m = -Infinity;
@@ -468,7 +492,7 @@ export class ClimateSpiral {
   }
 
   #radiusPx(anomaly, cam) {
-    return cam.rInner + ((anomaly - A_MIN) / (A_MAX - A_MIN)) * cam.rSpan;
+    return cam.rInner + ((anomaly - A_MIN) / (this.#aMax - A_MIN)) * cam.rSpan;
   }
 
   /** Perspective scale for a point already rotated into view space. */
@@ -655,7 +679,7 @@ export class ClimateSpiral {
     if (fade <= 0.05) return;
 
     // Month labels, just outside the widest ring.
-    const rLabel = this.#radiusPx(A_MAX, cam) * 1.06;
+    const rLabel = this.#radiusPx(this.#aMax, cam) * 1.06;
     ctx.globalAlpha = fade;
     ctx.fillStyle = this.#chrome.label;
     ctx.textBaseline = 'middle';

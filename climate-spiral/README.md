@@ -122,10 +122,24 @@ par [Climate Pulse](https://pulse.climate.copernicus.eu/) :
 
 <https://sites.ecmwf.int/data/climatepulse/data/series/era5_daily_series_2t_global.csv>
 
-Les anomalies publiées sont relatives à la période de référence 1991-2020. Pour les exprimer par
-rapport au niveau préindustriel 1850-1900, que la réanalyse ERA5 ne couvre pas, on ajoute l'offset
-standard de **+0,88 °C** retenu par C3S d'après le rapport IPCC AR6 WGI
-([Temperature Q&As](https://climate.copernicus.eu/temperature-qas)).
+Ce CSV source contient quatre colonnes :
+
+| Colonne | Signification |
+|---|---|
+| `2t` | Température moyenne journalière absolue, moyenne des 24 valeurs horaires de 00h à 23h UTC. |
+| `clim_91-20` | Climatologie du jour : la moyenne de `2t` pour cette date calendaire (ex. tous les 15 mars), calculée sur la période de référence 1991-2020. C'est la « normale » à laquelle le jour est comparé. |
+| `ano_91-20` | Anomalie du jour par rapport à sa climatologie 1991-2020, c'est-à-dire `2t − clim_91-20`. |
+| `status` | `PRELIMINARY` ou `FINAL` : les tout derniers jours sont provisoires et peuvent légèrement changer une fois les données ERA5 définitives disponibles (habituellement 3 jours de délai). |
+
+### Données affichées dans l'animation
+
+La spirale n'affiche pas `ano_91-20` brute, mais `ano_91-20 + 0,88` — l'anomalie ramenée au niveau
+préindustriel 1850-1900 plutôt qu'à la référence 1991-2020, ERA5 ne couvrant pas 1850-1900
+directement. Le décalage standard de **+0,88 °C** est celui retenu par C3S, d'après le rapport IPCC
+AR6 WGI ([Temperature Q&As](https://climate.copernicus.eu/temperature-qas)).
+
+C'est ce calcul qui est fait dans `build_data.py` avant écriture du JSON ; le rayon et la couleur de
+chaque jour dans la spirale suivent ensuite cette valeur décalée, pas la colonne brute du CSV.
 
 Les données Copernicus sont réutilisables sous la licence Copernicus, à condition de citer la
 source. La note de bas de page de `index.html` porte cette mention ; conservez-la si vous
@@ -137,6 +151,13 @@ depuis une autre origine.
 
 ## Notes d'implémentation
 
+- **Échelle rayon/couleur.** L'anomalie affichée (voir « Données affichées » ci-dessus) est mise à
+  l'échelle entre `A_MIN = -0,6 °C` (fixe) et un `A_MAX` calculé à l'initialisation :
+  `max(2,2, anomalie_max_des_données + 0,15)`. Le plancher de 2,2 reproduit exactement le rendu
+  actuel (l'anomalie maximale observée est +2,035 °C) ; il ne s'élève que si des données futures le
+  dépassent, et ne redescend jamais. La couleur suit la même règle. Ainsi, ajouter des années dans
+  `era5-daily-anomaly.json` — y compris des valeurs extrêmes — ne casse jamais le rendu : pas de
+  point qui déborde du cadre, pas besoin de retoucher le code.
 - **Projection.** La spirale occupe le plan XY, les années s'empilent sur Z. L'ouverture pilote
   conjointement l'inclinaison et l'écartement, ce qui garantit une vue de dessus exactement plate
   à `openness = 0`. La pile est recentrée verticalement à chaque image, sinon la division
