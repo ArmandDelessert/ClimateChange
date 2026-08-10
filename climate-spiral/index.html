@@ -110,7 +110,7 @@ spiral.on('change', (state) => {
 
   el('readout-year').textContent = String(state.year);
   el('readout-detail').textContent =
-    `${MONTHS_FR[state.month]} · ${anomalyFormat.format(state.anomalyC)} °C`;
+    `${state.date.getUTCDate()} ${MONTHS_FR[state.month]} · ${anomalyFormat.format(state.anomalyC)} °C`;
   el('date').textContent = state.date.toISOString().slice(0, 10);
 
   el('play').textContent = state.playing ? '❚❚ Pause' : '▶ Lire';
