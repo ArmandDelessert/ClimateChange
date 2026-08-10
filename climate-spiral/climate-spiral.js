@@ -834,11 +834,17 @@ export class ClimateSpiral {
     const s = this.#perspective(y, z, cam);
     const x = (this.#hoverX - cam.cx) / (s * cam.scale);
 
-    const theta = Math.atan2(y, x);
+    const rawTheta = Math.atan2(y, x);
     const label = this.#yearLabels[k];
     const daysInYear = isLeap(Number(label)) ? 366 : 365;
-    let d = Math.round(((theta + Math.PI / 2) / (2 * Math.PI)) * daysInYear);
+    let d = Math.round(((rawTheta + Math.PI / 2) / (2 * Math.PI)) * daysInYear);
     d = ((d % daysInYear) + daysInYear) % daysInYear;
+
+    // Snap to the exact angle of day `d` -- the same formula used to place
+    // the data points themselves -- rather than the pointer's raw angle, so
+    // the line jumps from day to day instead of sweeping continuously while
+    // the date label (already rounded) stays still.
+    const theta = (2 * Math.PI * d) / daysInYear - Math.PI / 2;
 
     // Runs from the inner bound of the drawing (A_MIN, not the centre) out
     // past the outer ring, like the reference rings' own radial extent.
