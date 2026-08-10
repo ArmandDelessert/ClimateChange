@@ -193,13 +193,16 @@ document.addEventListener('keydown', (event) => {
   const tag = event.target.tagName;
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'BUTTON') return;
 
-  // Plain arrows step by year; Ctrl/Cmd or Shift + arrow steps by day, for
-  // fine-grained scrubbing without leaving the keyboard.
+  // Plain arrows step by day (the finest, most frequent move); Shift steps
+  // by month; Ctrl/Cmd steps by year -- Home/End already own the series'
+  // extremes by the near-universal convention, so no modifier is spent on
+  // that here.
   if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
     event.preventDefault();
     const dir = event.key === 'ArrowLeft' ? -1 : 1;
-    if (event.ctrlKey || event.metaKey || event.shiftKey) spiral.stepDay(dir);
-    else spiral.stepYear(dir);
+    if (event.ctrlKey || event.metaKey) spiral.stepYear(dir);
+    else if (event.shiftKey) spiral.stepMonth(dir);
+    else spiral.stepDay(dir);
     return;
   }
 

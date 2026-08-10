@@ -359,6 +359,36 @@ export class ClimateSpiral {
   }
 
   /**
+   * Move by calendar months, keeping the day of month (clamped when the
+   * target month is shorter, e.g. 31 Jan -> 28/29 Feb) -- unlike stepYear,
+   * which always resets to day 1, so repeated month steps stay composable
+   * (twelve of them land close to one year later, not on 1 January).
+   * @param {number} delta
+   */
+  stepMonth(delta) {
+    this.pause();
+    const { year, month, date } = this.state;
+    const day = date.getUTCDate();
+
+    let targetYear = year;
+    let targetMonth = month + delta;
+    while (targetMonth < 0) { targetMonth += 12; targetYear--; }
+    while (targetMonth > 11) { targetMonth -= 12; targetYear++; }
+
+    const k = this.#yearLabels.indexOf(String(targetYear));
+    if (k < 0) {
+      this.seekToIndex(delta > 0 ? this.#count - 1 : 0);
+      return;
+    }
+    const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+    const targetDay = Math.min(day, daysInTargetMonth);
+    const doy = Math.floor(
+      (Date.UTC(targetYear, targetMonth, targetDay) - Date.UTC(targetYear, 0, 1)) / 86400000,
+    );
+    this.seekToIndex(clamp(this.#yearStart[k] + doy, this.#yearStart[k], this.#yearStart[k + 1] - 1));
+  }
+
+  /**
    * Move by single days, clamped to the series' bounds.
    * @param {number} delta
    */

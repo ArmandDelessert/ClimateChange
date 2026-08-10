@@ -63,7 +63,8 @@ et suit les redimensionnements via un `ResizeObserver`.
 | `play()` / `pause()` / `toggle()` | Lecture automatique. Relance depuis 1940 si le curseur est à la fin. |
 | `seekToIndex(i)` | Positionne sur le i-ème jour (0 = 1940-01-01). |
 | `seekToYear(1998)` | Positionne au 1er janvier de l'année. |
-| `stepYear(±1)` | Avance ou recule d'une année pleine. |
+| `stepYear(±1)` | Avance ou recule d'une année pleine (revient toujours au 1er janvier). |
+| `stepMonth(±1)` | Avance ou recule d'un mois civil, en gardant le quantième (écrêté si le mois cible est plus court, ex. 31 janv. → 28/29 févr.). |
 | `stepDay(±1)` | Avance ou recule d'un seul jour. |
 | `setOpenness(v, animate)` | `0` à plat, `1` entonnoir. Transition adoucie de 900 ms par défaut. |
 | `setSpeed(joursParSeconde)`, `setLoop(bool)`, `setTheme('dark'\|'light')` | |
@@ -109,9 +110,20 @@ par `fetch` à l'exécution, publier un nouveau `era5-daily-anomaly.json` sur la
 GitHub Pages suffit — aucune reconstruction du site n'est nécessaire.
 
 Le même workflow relève l'en-tête `Last-Modified` du CSV source à chaque exécution et l'ajoute à
-`data/source-last-modified-log.csv`. La cadence de publication exacte de la source n'étant pas
+`data/source-last-modified-log.csv`, avec la date et le statut (`PRELIMINARY`/`FINAL`) du dernier
+jour alors disponible dans ce CSV. La cadence de publication exacte de la source n'étant pas
 documentée, ce journal permet de la déterminer après quelques semaines de relevés, et d'ajuster
 l'horaire du cron en conséquence si besoin.
+
+`last_modified` vient de l'en-tête HTTP `Last-Modified` (un `curl -I` sur l'URL source) — la date
+et l'heure réelles de dernière modification du fichier côté serveur. C'est différent du commentaire
+`# Last updated:` à l'intérieur du CSV, qui ne porte qu'une date, sans heure : ce sont deux sources
+distinctes, l'une (HTTP) précise à la seconde, l'autre (contenu du fichier) plus grossière.
+
+`csv_last_date`/`csv_last_status` ne redemandent pas le CSV séparément : ce sont `meta.lastDate` et
+un statut déduit de `era5-daily-anomaly.json`, déjà régénéré par `build_data.py` juste avant dans le
+même job — le jour le plus récent est `FINAL` seulement s'il coïncide avec `meta.lastFinalDate`, la
+source ne plaçant jamais de jour `FINAL` après un jour `PRELIMINARY`.
 
 Les anomalies sont stockées en **milli-degrés entiers** (`valeur / 1000 = °C`). C'est exactement la
 précision de la source ; un arrondi plus grossier reclasserait des jours situés juste au-dessus
@@ -212,13 +224,19 @@ Raccourcis clavier :
 | Touche | Effet |
 | --- | --- |
 | Espace | Lecture / pause |
-| ← → | Année précédente / suivante |
-| Ctrl/Cmd/Maj + ← → | Jour précédent / suivant |
+| ← → | Jour précédent / suivant |
+| Maj + ← → | Mois précédent / suivant |
+| Ctrl/Cmd + ← → | Année précédente / suivante |
 | Origine / Fin | Tout début (1940-01-01) / jour le plus récent |
 
 `Origine`/`Fin` couvrent déjà les extrémités, par la convention quasi universelle des lecteurs
-média et des `<input type="range">` natifs — pas besoin d'une combinaison en plus pour ça. Pour le
-pas fin, en revanche, ce module inverse volontairement la convention courante des éditeurs de texte
-et de Figma/Photoshop (« touche seule = petit pas, modificateur = grand pas ») : ici, la touche
-seule fait un **an**, le modificateur un **jour**, parce que sur 87 ans et 31 000+ jours, parcourir
-au jour par défaut serait épuisant.
+média et des `<input type="range">` natifs — pas besoin d'une combinaison en plus pour ça.
+
+Pour les trois tailles de pas restantes (jour/mois/année), la référence la plus proche est le
+clavier des sélecteurs de date (ex. le datepicker jQuery UI) : flèches = jour, Page préc./suiv. =
+mois, Maj + Page préc./suiv. = année. N'utilisant que ← →, ce module adapte ce principe avec les
+modificateurs plutôt que Page préc./suiv. : **touche seule = jour** (le geste le plus fréquent),
+**Maj = mois**, **Ctrl/Cmd = année** — Maj comme « pas plus grand » suit l'usage courant (Figma,
+Photoshop, montage vidéo), Ctrl comme « saut de plus haut niveau » suit celui des éditeurs de texte
+(`Ctrl+Home`/`Ctrl+End` = début/fin de document, un cran au-dessus de `Home`/`End` = début/fin de
+ligne).

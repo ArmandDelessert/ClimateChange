@@ -39,10 +39,23 @@ jobs:
           LAST_MODIFIED=$(curl -sI -A "Mozilla/5.0 (compatible; climate-spiral-build/1.0)" "$SOURCE_URL" \
             | grep -i '^last-modified:' | cut -d' ' -f2- | tr -d '\r')
 
+          # meta.lastDate is the newest day in the series regardless of
+          # status; it's FINAL only if it also equals lastFinalDate, since
+          # the source never has a FINAL day younger than a PRELIMINARY one.
+          read -r CSV_LAST_DATE CSV_LAST_STATUS <<< "$(python -c "
+          import json
+          m = json.load(open('climate-spiral/data/era5-daily-anomaly.json'))['meta']
+          status = 'FINAL' if m['lastDate'] == m['lastFinalDate'] else 'PRELIMINARY'
+          print(m['lastDate'], status)
+          ")"
+
           if [ ! -f "$LOG_FILE" ]; then
-            echo "checked_at_utc,last_modified" > "$LOG_FILE"
+            echo "checked_at_utc,last_modified,csv_last_date,csv_last_status" > "$LOG_FILE"
           fi
-          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ),${LAST_MODIFIED}" >> "$LOG_FILE"
+          # last_modified is HTTP-date and carries its own comma (e.g. "Fri, 07
+          # Aug 2026 04:11:50 GMT") -- quote it, or it silently becomes an
+          # extra unwanted CSV column.
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ),\"${LAST_MODIFIED}\",${CSV_LAST_DATE},${CSV_LAST_STATUS}" >> "$LOG_FILE"
 
       - name: Committer si les données ont changé
         run: |
