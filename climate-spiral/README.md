@@ -6,6 +6,8 @@ interpole en continu entre la spirale vue de dessus et un entonnoir 3D où les a
 écartées le long d'un axe temporel — étroit et bleu dans les années 1940, évasé et rouge
 aujourd'hui.
 
+Cette représentation s'inspire de l'animation publiée par [warming.watch](https://warming.watch/) sur [Instagram](https://www.instagram.com/p/DbVz9sjHHIN/).
+
 Module ES sans aucune dépendance, rendu en Canvas 2D avec une projection perspective écrite à la
 main (pas de bibliothèque 3D).
 
